@@ -1,0 +1,92 @@
+name: Build executables
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: bun-linux-x64
+            output: ebc-tiles-linux-x64
+          - target: bun-linux-arm64
+            output: ebc-tiles-linux-arm64
+          - target: bun-linux-x64-musl
+            output: ebc-tiles-linux-x64-musl
+          - target: bun-linux-arm64-musl
+            output: ebc-tiles-linux-arm64-musl
+          - target: bun-darwin-x64
+            output: ebc-tiles-macos-x64
+          - target: bun-darwin-arm64
+            output: ebc-tiles-macos-arm64
+          - target: bun-windows-x64
+            output: ebc-tiles-windows-x64.exe
+          - target: bun-windows-arm64
+            output: ebc-tiles-windows-arm64.exe
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build executable
+        run: |
+          mkdir -p dist
+          bun build src/index.ts \
+            --compile \
+            --target "${{ matrix.target }}" \
+            --outfile "dist/${{ matrix.output }}"
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.output }}
+          path: dist/${{ matrix.output }}
+          if-no-files-found: error
+
+  release:
+    name: Create release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download executables
+        uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums
+        working-directory: dist
+        run: sha256sum ebc-tiles-* > SHA256SUMS
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v3
+        with:
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/ebc-tiles-*
+            dist/SHA256SUMS
