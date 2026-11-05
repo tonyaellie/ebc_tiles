@@ -99,7 +99,7 @@ const main = async (): Promise<void> => {
       const alt = `Quest ${quest.number}`;
 
       images.push(
-        `  <a href="${questUrl}"><img src="${imageUrl}" alt="${alt}" width="220"></a>`,
+        `  <a href="${questUrl}"><img src="${imageUrl}" alt="${alt}" width="161"></a>`,
       );
     }
 
